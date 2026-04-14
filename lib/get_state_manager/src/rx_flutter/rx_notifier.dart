@@ -43,7 +43,7 @@ mixin StateMixin<T> on ListNotifier {
   T get state => value;
 
   set status(GetStatus<T> newStatus) {
-    if (newStatus == status) return;
+    if (newStatus == _status) return;
     _status = newStatus;
     if (newStatus is SuccessStatus<T>) {
       _value = newStatus.data;
@@ -66,7 +66,7 @@ mixin StateMixin<T> on ListNotifier {
 
   @protected
   void change(GetStatus<T> status) {
-    if (status != this.status) {
+    if (status != _status) {
       this.status = status;
     }
   }
@@ -98,12 +98,9 @@ mixin StateMixin<T> on ListNotifier {
       } else {
         status = GetStatus<T>.success(newValue);
       }
-
-      refresh();
     }, onError: (err) {
       status = GetStatus.error(
           err is Exception ? err : Exception(errorMessage ?? err.toString()));
-      refresh();
     });
   }
 }
@@ -116,14 +113,20 @@ class GetListenable<T> extends ListNotifierSingle implements RxInterface<T> {
   GetListenable(T val) : _value = val;
 
   StreamController<T>? _controller;
+  Disposer? _streamDisposer;
 
   StreamController<T> get subject {
     if (_controller == null) {
-      _controller =
-          StreamController<T>.broadcast(onCancel: addListener(_streamListener));
-      _controller?.add(_value);
-
-      ///TODO: report to controller dispose
+      _controller = StreamController<T>.broadcast(
+        onListen: () {
+          _streamDisposer = addListener(_streamListener);
+          _controller?.add(_value);
+        },
+        onCancel: () {
+          _streamDisposer?.call();
+          _streamDisposer = null;
+        },
+      );
     }
     return _controller!;
   }
@@ -135,8 +138,10 @@ class GetListenable<T> extends ListNotifierSingle implements RxInterface<T> {
   @override
   @mustCallSuper
   void close() {
-    removeListener(_streamListener);
+    _streamDisposer?.call();
+    _streamDisposer = null;
     _controller?.close();
+    _controller = null;
     dispose();
   }
 

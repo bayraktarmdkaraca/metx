@@ -22,15 +22,13 @@ class ListNotifierGroup = ListNotifier with ListNotifierGroupMixin;
 /// containsListener implementation
 mixin ListNotifierSingleMixin on Listenable {
   List<GetStateUpdate>? _updaters = <GetStateUpdate>[];
-
-  // final int _version = 0;
-  // final int _microtaskVersion = 0;
+  bool _notifying = false;
 
   @override
   Disposer addListener(GetStateUpdate listener) {
     assert(_debugAssertNotDisposed());
     _updaters!.add(listener);
-    return () => _updaters!.remove(listener);
+    return () => _updaters?.remove(listener);
   }
 
   bool containsListener(GetStateUpdate listener) {
@@ -60,18 +58,20 @@ mixin ListNotifierSingleMixin on Listenable {
   }
 
   void _notifyUpdate() {
-    // if (_microtaskVersion == _version) {
-    //   _microtaskVersion++;
-    //   scheduleMicrotask(() {
-    //     _version++;
-    //     _microtaskVersion = _version;
-    final list = _updaters?.toList() ?? [];
-
-    for (var element in list) {
-      element();
+    if (_notifying) return;
+    _notifying = true;
+    try {
+      final updaters = _updaters;
+      if (updaters == null || updaters.isEmpty) return;
+      // Snapshot so that add/remove during iteration doesn't skip or
+      // double-invoke listeners (e.g. a listener removing itself).
+      final snapshot = List<GetStateUpdate>.of(updaters);
+      for (var i = 0; i < snapshot.length; i++) {
+        snapshot[i]();
+      }
+    } finally {
+      _notifying = false;
     }
-    //   });
-    // }
   }
 
   bool get isDisposed => _updaters == null;

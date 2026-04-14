@@ -474,15 +474,12 @@ class BindElement<T> extends InheritedElement {
         }
       }
     } else {
-      if (widget.create != null) {
-        _controllerBuilder = () => widget.create!.call(this);
-        Get.spawn<T>(_controllerBuilder!, tag: widget.tag, permanent: false);
-      } else {
-        _controllerBuilder = widget.init;
-      }
       _controllerBuilder =
           (widget.create != null ? () => widget.create!.call(this) : null) ??
               widget.init;
+      if (widget.create != null) {
+        Get.spawn<T>(_controllerBuilder!, tag: widget.tag, permanent: false);
+      }
       _isCreator = true;
       _needStart = true;
     }
@@ -543,13 +540,15 @@ class BindElement<T> extends InheritedElement {
     disposers.clear();
 
     _remove?.call();
+    if (!widget.global && _wasStarted) {
+      (_controller as GetLifeCycleMixin?)?.onDelete();
+    }
     _controller = null;
     _isCreator = null;
     _remove = null;
     _filter = null;
     _needStart = null;
     _controllerBuilder = null;
-    _controller = null;
   }
 
   @override

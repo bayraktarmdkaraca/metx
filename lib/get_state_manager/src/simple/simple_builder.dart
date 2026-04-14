@@ -96,13 +96,15 @@ abstract class ObxStatelessWidget extends StatelessWidget {
 /// a Component that can track changes in a reactive variable
 mixin StatelessObserverComponent on StatelessElement {
   List<Disposer>? disposers = <Disposer>[];
+  bool _pendingRebuild = false;
 
   void getUpdate() {
-    // if (disposers != null && !dirty) {
-    //   markNeedsBuild();
-    // }
-    if (disposers != null) {
-      scheduleMicrotask(markNeedsBuild);
+    if (disposers != null && !_pendingRebuild) {
+      _pendingRebuild = true;
+      scheduleMicrotask(() {
+        _pendingRebuild = false;
+        if (disposers != null) markNeedsBuild();
+      });
     }
   }
 
